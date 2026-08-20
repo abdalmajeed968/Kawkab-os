@@ -5,7 +5,7 @@
   "description": "KAWKAB OS — Phase 0: canonical data foundation, audit trail, RBAC, documents infrastructure, design system, app shell, dashboard shell",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && prisma db seed && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
