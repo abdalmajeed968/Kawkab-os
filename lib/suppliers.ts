@@ -6,9 +6,12 @@ import { writeAuditLog } from "./audit";
 
 export interface SupplierInput {
   name: string;
+  contactName?: string;
   email?: string;
   phone?: string;
   website?: string;
+  accountNumber?: string;
+  paymentTerms?: string;
   notes?: string;
 }
 
@@ -41,7 +44,16 @@ export async function createSupplier(input: SupplierInput, actingUserId: string,
 
   return prisma.$transaction(async (tx) => {
     const supplier = await tx.supplier.create({
-      data: { name: input.name, email: input.email, phone: input.phone, website, notes: input.notes },
+      data: {
+        name: input.name,
+        contactName: input.contactName,
+        email: input.email,
+        phone: input.phone,
+        website,
+        accountNumber: input.accountNumber,
+        paymentTerms: input.paymentTerms,
+        notes: input.notes,
+      },
     });
     await writeAuditLog(tx, {
       userId: actingUserId,
@@ -72,9 +84,12 @@ export async function updateSupplier(
       where: { id: supplierId },
       data: {
         name: input.name,
+        contactName: input.contactName,
         email: input.email,
         phone: input.phone,
         website: input.website !== undefined ? (website ?? null) : undefined,
+        accountNumber: input.accountNumber,
+        paymentTerms: input.paymentTerms,
         notes: input.notes,
       },
     });

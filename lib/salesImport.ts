@@ -38,6 +38,36 @@ const COLUMN_CANDIDATES = {
   currency: ["currency"],
 };
 
+// Amazon's Payments -> Reports Repository -> Transaction report is a wide,
+// one-row-per-transaction ledger with a SEPARATE column per fee/revenue
+// type — not the one-amount-plus-one-type-per-row shape COLUMN_CANDIDATES.
+// amount/amountType above assumes. A row from that report is checked
+// against every entry here; each column that's actually present (even a
+// real "0") becomes its own SaleFinancialEvent, so nothing on a wide row
+// is silently dropped in favor of picking just one column. See
+// commitFinanceBatch below for how this and the narrow single-amount
+// shape coexist without double-counting the same row.
+const FEE_COLUMN_CANDIDATES: Array<{ type: FinancialEventType; candidates: string[] }> = [
+  { type: "PRODUCT_REVENUE", candidates: ["product sales", "product-sales"] },
+  { type: "REFERRAL_FEE", candidates: ["selling fees", "selling-fees", "referral fee", "referral-fee", "referral fees"] },
+  { type: "FBA_FULFILLMENT_FEE", candidates: ["fba fees", "fba-fees", "fba per unit fulfillment fee", "fulfillment fee", "fulfillment fees"] },
+  { type: "OTHER_FEE", candidates: ["other transaction fees", "other-transaction-fees", "regulatory fee", "other"] },
+  { type: "PROMOTION", candidates: ["promotional rebates", "promotional-rebates"] },
+  { type: "REIMBURSEMENT", candidates: ["reimbursement", "reimbursements"] },
+  {
+    type: "TAX",
+    candidates: [
+      "product sales tax",
+      "shipping credits tax",
+      "gift wrap credits tax",
+      "giftwrap credits tax",
+      "marketplace withheld tax",
+      "promotional rebates tax",
+      "tax on regulatory fee",
+    ],
+  },
+];
+
 /**
  * Normalizes a header for matching: lowercase, trimmed, with spaces,
  * underscores, and hyphens all collapsed away. This is what lets
@@ -359,17 +389,6 @@ export async function commitFinanceBatch(importBatchId: string, actingUserId: st
   for (const row of rows) {
     try {
       const raw = row.rawData as Record<string, unknown>;
-      const amountRaw = findColumnValue(raw, COLUMN_CANDIDATES.amount);
-      if (amountRaw === undefined) throw new Error("Missing amount.");
-      const amount = Number(amountRaw);
-      if (isNaN(amount)) throw new Error("Amount is not a valid number.");
-
-      const eventTypeRaw = String(findColumnValue(raw, COLUMN_CANDIDATES.amountType) ?? "OTHER")
-        .toUpperCase()
-        .replace(/[\s-]+/g, "_");
-      const eventType = (Object.values(FinancialEventType) as string[]).includes(eventTypeRaw)
-        ? (eventTypeRaw as FinancialEventType)
-        : "OTHER";
 
       const eventDateRaw = findColumnValue(raw, COLUMN_CANDIDATES.eventDate);
       const eventDate = eventDateRaw ? new Date(String(eventDateRaw)) : new Date();
@@ -380,30 +399,58 @@ export async function commitFinanceBatch(importBatchId: string, actingUserId: st
       const externalEventId = findColumnValue(raw, COLUMN_CANDIDATES.transactionId);
       const currency = String(findColumnValue(raw, COLUMN_CANDIDATES.currency) ?? "USD");
 
-      await createFinancialEvent(
-        {
-          eventType,
-          amount,
-          currency,
-          eventDate,
-          externalEventId: externalEventId ? String(externalEventId) : undefined,
-          externalOrderId: externalOrderId ? String(externalOrderId) : undefined,
-          externalLineItemId: externalLineItemId ? String(externalLineItemId) : undefined,
-          productId: row.matchedProductId,
-          importBatchId,
-          importedRowId: row.id,
-          // 1 row -> 1 event today, so the row's own id is a correct,
-          // trivially-unique fingerprint. If a future parser splits one
-          // finance-report row into several events (e.g. one row with
-          // separate fee columns), this needs to become
-          // `${row.id}:${eventType}` or similar at that time — noted here
-          // rather than pre-built for a shape not yet seen in a real report.
-          importFingerprint: row.id,
-          notes: `Imported from ${batch.filename}`,
-        },
-        actingUserId,
-        role
-      );
+      const shared = {
+        currency,
+        eventDate,
+        externalEventId: externalEventId ? String(externalEventId) : undefined,
+        externalOrderId: externalOrderId ? String(externalOrderId) : undefined,
+        externalLineItemId: externalLineItemId ? String(externalLineItemId) : undefined,
+        productId: row.matchedProductId,
+        importBatchId,
+        importedRowId: row.id,
+        notes: `Imported from ${batch.filename}`,
+      };
+
+      // Wide shape first — Amazon's own Transaction report (Payments ->
+      // Reports Repository) puts revenue and every fee type in separate
+      // columns on one row. Every column actually present becomes its own
+      // event, keyed `${row.id}:${eventType}` so multiple events from the
+      // same row each get a distinct, stable duplicate-protection
+      // fingerprint instead of colliding on the row id alone.
+      let wideEventsCreated = 0;
+      for (const { type, candidates } of FEE_COLUMN_CANDIDATES) {
+        const valueRaw = findColumnValue(raw, candidates);
+        if (valueRaw === undefined) continue;
+        const amount = Number(valueRaw);
+        if (isNaN(amount)) continue;
+        await createFinancialEvent(
+          { eventType: type, amount, importFingerprint: `${row.id}:${type}`, ...shared },
+          actingUserId,
+          role
+        );
+        wideEventsCreated++;
+      }
+
+      if (wideEventsCreated === 0) {
+        // Narrow shape fallback — one amount + one type column per row.
+        const amountRaw = findColumnValue(raw, COLUMN_CANDIDATES.amount);
+        if (amountRaw === undefined) throw new Error("Missing amount.");
+        const amount = Number(amountRaw);
+        if (isNaN(amount)) throw new Error("Amount is not a valid number.");
+
+        const eventTypeRaw = String(findColumnValue(raw, COLUMN_CANDIDATES.amountType) ?? "OTHER")
+          .toUpperCase()
+          .replace(/[\s-]+/g, "_");
+        const eventType = (Object.values(FinancialEventType) as string[]).includes(eventTypeRaw)
+          ? (eventTypeRaw as FinancialEventType)
+          : "OTHER";
+
+        await createFinancialEvent(
+          { eventType, amount, importFingerprint: row.id, ...shared },
+          actingUserId,
+          role
+        );
+      }
 
       await prisma.importedRow.update({ where: { id: row.id }, data: { status: "COMMITTED" } });
       created++;

@@ -28,6 +28,7 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
               {supplier.name}
             </div>
             <div className="card-subtitle">
+              {supplier.contactName ? `${supplier.contactName} · ` : ""}
               {supplier.email ?? "No email"} · {supplier.phone ?? "No phone"}
               {supplier.website && (
                 <>
@@ -37,6 +38,8 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
                   </a>
                 </>
               )}
+              {supplier.accountNumber && ` · Account: ${supplier.accountNumber}`}
+              {supplier.paymentTerms && ` · Terms: ${supplier.paymentTerms}`}
             </div>
           </div>
         </div>
@@ -46,9 +49,12 @@ export default async function SupplierDetailPage({ params }: { params: { id: str
             supplier={{
               id: supplier.id,
               name: supplier.name,
+              contactName: supplier.contactName,
               email: supplier.email,
               phone: supplier.phone,
               website: supplier.website,
+              accountNumber: supplier.accountNumber,
+              paymentTerms: supplier.paymentTerms,
               notes: supplier.notes,
             }}
           />

@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 export function NewSupplierForm() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [contactName, setContactName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [paymentTerms, setPaymentTerms] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,7 +26,15 @@ export function NewSupplierForm() {
     const res = await fetch("/api/suppliers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email: email || undefined, phone: phone || undefined, website: website || undefined }),
+      body: JSON.stringify({
+        name,
+        contactName: contactName || undefined,
+        email: email || undefined,
+        phone: phone || undefined,
+        website: website || undefined,
+        accountNumber: accountNumber || undefined,
+        paymentTerms: paymentTerms || undefined,
+      }),
     });
     setSubmitting(false);
     if (!res.ok) {
@@ -32,9 +43,12 @@ export function NewSupplierForm() {
       return;
     }
     setName("");
+    setContactName("");
     setEmail("");
     setPhone("");
     setWebsite("");
+    setAccountNumber("");
+    setPaymentTerms("");
     router.refresh();
   }
 
@@ -44,6 +58,10 @@ export function NewSupplierForm() {
       <div className="form-field">
         <label>Name</label>
         <input value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="form-field">
+        <label>Contact name</label>
+        <input value={contactName} onChange={(e) => setContactName(e.target.value)} />
       </div>
       <div className="form-field">
         <label>Email</label>
@@ -56,6 +74,14 @@ export function NewSupplierForm() {
       <div className="form-field">
         <label>Website (optional)</label>
         <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="supplier.com" />
+      </div>
+      <div className="form-field">
+        <label>Account number</label>
+        <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+      </div>
+      <div className="form-field">
+        <label>Payment terms</label>
+        <input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30" />
       </div>
       {error && <div className="auth-error">{error}</div>}
       <button type="submit" className="button-primary" disabled={submitting}>

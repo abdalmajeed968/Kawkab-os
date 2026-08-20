@@ -362,21 +362,29 @@ enum FulfillmentType {
 }
 
 model Product {
-  id              String          @id @default(cuid())
-  name            String
+  id                   String          @id @default(cuid())
+  name                 String
   // Free text, deliberately not a FK to a Brand table yet — per Owner
   // instruction, brand must always support manual entry; a Brand entity
   // with autocomplete can be layered on later without this field changing
   // shape (it would become the default/seed value for a new Brand row,
   // not get migrated away).
-  brand           String?
-  brandId         String? // optional formal link to a Brand CRM record — the free-text field above always still works
-  status          ProductStatus   @default(ACTIVE)
-  fulfillmentType FulfillmentType @default(UNKNOWN)
-  notes           String?
-  createdByUserId String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  brand                String?
+  brandId              String? // optional formal link to a Brand CRM record — the free-text field above always still works
+  status               ProductStatus   @default(ACTIVE)
+  fulfillmentType      FulfillmentType @default(UNKNOWN)
+  // Where this product is sourced from — a supplier product listing page,
+  // not the supplier's general website (Supplier.website already covers
+  // that). Optional, free text, never required.
+  sourceUrl            String?
+  // The owner's own target/expected selling price, entered at product
+  // creation — distinct from actualAverageSellingPrice, which is always
+  // computed from real Amazon sale data, never this field.
+  expectedSellingPrice Decimal?        @db.Decimal(12, 4)
+  notes                String?
+  createdByUserId      String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
   identifiers         ProductIdentifier[]
   purchaseItems       PurchaseItem[]
@@ -437,14 +445,17 @@ enum ApprovalStatus {
 // --------------------------------------------------------------------------
 
 model Supplier {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  phone     String?
-  website   String? // optional — validated as a URL shape in the service layer, never required
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  contactName   String?
+  email         String?
+  phone         String?
+  website       String? // optional — validated as a URL shape in the service layer, never required
+  accountNumber String?
+  paymentTerms  String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   purchases            Purchase[]
   eligibilityCandidate ProductEligibility[]

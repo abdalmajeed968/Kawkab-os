@@ -485,4 +485,41 @@ describe("Sales import — real Amazon data (CSV/Excel)", () => {
     const saleItem = await prisma.saleItem.findFirstOrThrow({ where: { externalLineItemId: "ITEM-RBAC-OP-1" } });
     await expect(reverseSaleItemConsumption(saleItem.id, "test", operator.id, "OPERATOR")).rejects.toThrow(PermissionError);
   });
+
+  it("wide Transaction-report row (Payments > Reports Repository) splits every present fee/revenue column into its own event, never dropping columns or double-counting", async () => {
+    const sku = `SKU-TXN-WIDE-${Date.now()}`;
+    const product = await makeProductWithInventory(sku, 10, 5);
+
+    const buffer = csvBuffer(
+      ["date", "type", "order id", "sku", "product sales", "product sales tax", "selling fees", "fba fees", "other transaction fees", "promotional rebates", "total"],
+      [["2026-03-01", "Order", "ORDER-TXN-WIDE-1", sku, "29.99", "1.50", "-4.50", "-3.25", "-0.30", "-2.00", "19.94"]]
+    );
+
+    const batch = await startImport({ filename: "transaction-report.csv", buffer, reportType: "FINANCE" }, ownerId, "OWNER");
+    await matchImportBatch(batch.id, ownerId, "OWNER");
+    const result = await commitFinanceBatch(batch.id, ownerId, "OWNER");
+    expect(result.created).toBe(1);
+    expect(result.failed).toBe(0);
+
+    const events = await prisma.saleFinancialEvent.findMany({ where: { importBatchId: batch.id }, orderBy: { eventType: "asc" } });
+    expect(events.every((e) => e.productId === product.id)).toBe(true);
+    // 6 real columns on this row: product sales, product sales tax, selling
+    // fees, fba fees, other transaction fees, promotional rebates.
+    expect(events).toHaveLength(6);
+    const byType = Object.fromEntries(events.map((e) => [e.eventType, Number(e.amount)]));
+    expect(byType.PRODUCT_REVENUE).toBeCloseTo(29.99, 2);
+    expect(byType.TAX).toBeCloseTo(1.5, 2);
+    expect(byType.REFERRAL_FEE).toBeCloseTo(-4.5, 2);
+    expect(byType.FBA_FULFILLMENT_FEE).toBeCloseTo(-3.25, 2);
+    expect(byType.OTHER_FEE).toBeCloseTo(-0.3, 2);
+    expect(byType.PROMOTION).toBeCloseTo(-2.0, 2);
+
+    // Re-uploading the exact same report must not duplicate any of the 6 events.
+    const batch2 = await startImport({ filename: "transaction-report.csv", buffer, reportType: "FINANCE" }, ownerId, "OWNER");
+    const row2 = await prisma.importedRow.findFirstOrThrow({ where: { importBatchId: batch2.id } });
+    expect(row2.status).toBe("DUPLICATE");
+    await commitFinanceBatch(batch2.id, ownerId, "OWNER");
+    const eventsAfterReimport = await prisma.saleFinancialEvent.findMany({ where: { productId: product.id } });
+    expect(eventsAfterReimport).toHaveLength(6);
+  });
 });

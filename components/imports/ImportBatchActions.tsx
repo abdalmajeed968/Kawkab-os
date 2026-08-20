@@ -8,6 +8,7 @@ export function ImportBatchActions({ batchId, reportType, status }: { batchId: s
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [committed, setCommitted] = useState(false);
 
   async function runMatch() {
     setSubmitting("match");
@@ -38,10 +39,12 @@ export function ImportBatchActions({ batchId, reportType, status }: { batchId: s
     const successCount = result.committed ?? result.created ?? 0;
     const failCount = result.failed ?? 0;
     setMessage(`Committed ${successCount} row(s)${failCount > 0 ? `, ${failCount} failed — see error rows below` : ""}.`);
+    setCommitted(true);
     router.refresh();
   }
 
   const isFinished = status === "PROCESSED";
+  const resultsHref = reportType === "FINANCE" ? "/finance" : reportType === "SALES" ? "/sales" : "/reports";
 
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -57,6 +60,11 @@ export function ImportBatchActions({ batchId, reportType, status }: { batchId: s
               ? "Commit financial events"
               : "Commit"}
       </button>
+      {(committed || isFinished) && (
+        <a href={resultsHref} className="button-secondary" style={{ textDecoration: "none" }}>
+          View Results
+        </a>
+      )}
       {message && <span style={{ fontSize: 13, color: "var(--kw-status-profit)" }}>{message}</span>}
       {error && <span className="auth-error">{error}</span>}
     </div>

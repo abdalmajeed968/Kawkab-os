@@ -15,19 +15,38 @@ export interface ParsedFile {
   headers: string[];
 }
 
+// Amazon's own exports (Seller Central "Transaction" reports especially)
+// are frequently UTF-8-with-BOM and just as often tab-delimited despite a
+// .csv extension. Both are stripped/detected here rather than assumed away
+// by the caller — a BOM left in place corrupts the first header's name
+// (e.g. "﻿sku" no longer equals "sku"), silently breaking every
+// downstream column match.
+function stripBom(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 export function parseCsv(buffer: Buffer): ParsedFile {
-  const text = buffer.toString("utf-8");
+  const text = stripBom(buffer.toString("utf-8"));
   const result = Papa.parse<Record<string, unknown>>(text, {
     header: true,
     skipEmptyLines: true,
     dynamicTyping: false,
+    // Deliberately omitted `delimiter` — Papa Parse auto-detects among
+    // comma/tab/pipe/semicolon per file, which is what actually lets the
+    // same code path handle both a comma-delimited CSV and a
+    // tab-delimited "Transaction" report saved with a .csv extension.
   });
   if (result.errors.length > 0) {
     const first = result.errors[0];
     throw new Error(`CSV parse error at row ${first.row}: ${first.message}`);
   }
-  const headers = result.meta.fields ?? [];
-  return { rows: result.data, headers };
+  const headers = (result.meta.fields ?? []).map((h) => stripBom(h));
+  const rows = result.data.map((row) => {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) cleaned[stripBom(key)] = value;
+    return cleaned;
+  });
+  return { rows, headers };
 }
 
 export function parseExcel(buffer: Buffer): ParsedFile {
@@ -42,7 +61,10 @@ export function parseExcel(buffer: Buffer): ParsedFile {
 
 export function parseImportFile(buffer: Buffer, filename: string): ParsedFile {
   const lower = filename.toLowerCase();
-  if (lower.endsWith(".csv")) return parseCsv(buffer);
+  // .txt and .tsv are Amazon's own export extensions for tab-delimited
+  // reports (the Transaction report in particular) — same parser as .csv,
+  // since Papa Parse auto-detects the delimiter rather than assuming comma.
+  if (lower.endsWith(".csv") || lower.endsWith(".txt") || lower.endsWith(".tsv")) return parseCsv(buffer);
   if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) return parseExcel(buffer);
-  throw new Error(`Unsupported file type: ${filename}. Upload a .csv, .xlsx, or .xls file.`);
+  throw new Error(`Unsupported file type: ${filename}. Upload a .csv, .tsv, .txt, .xlsx, or .xls file.`);
 }

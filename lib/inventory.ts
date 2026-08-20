@@ -63,25 +63,34 @@ export interface InventorySummaryRow {
   quantityOnHand: number;
   batchCount: number;
   oldestBatchDate: Date | null;
+  inventoryValue: { value: number; isComplete: boolean };
+  fulfillmentType: string;
 }
 
 /** Backs the Inventory list page and the dashboard's Inventory Health widget. */
 export async function listInventorySummary(): Promise<InventorySummaryRow[]> {
   const products = await prisma.product.findMany({
     where: { purchaseItems: { some: {} } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, fulfillmentType: true },
   });
 
   const rows: InventorySummaryRow[] = [];
   for (const product of products) {
     const batches = await getAvailableBatches(product.id);
     if (batches.length === 0) continue; // fully consumed — nothing on hand
+    const isComplete = batches.every((b) => b.landedUnitCost.isComplete);
+    const inventoryValue = batches.reduce(
+      (sum, b) => sum + (b.landedUnitCost.isComplete ? b.landedUnitCost.value : b.unitPurchaseCost) * b.quantityAvailable,
+      0
+    );
     rows.push({
       productId: product.id,
       productName: product.name,
       quantityOnHand: batches.reduce((sum, b) => sum + b.quantityAvailable, 0),
       batchCount: batches.length,
       oldestBatchDate: batches[0]?.purchaseDate ?? null,
+      inventoryValue: { value: inventoryValue, isComplete },
+      fulfillmentType: product.fulfillmentType,
     });
   }
   return rows;

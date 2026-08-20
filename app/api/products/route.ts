@@ -22,7 +22,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const product = await createProduct(
-      { name: body.name, brand: body.brand, fulfillmentType: body.fulfillmentType, notes: body.notes },
+      {
+        name: body.name,
+        brand: body.brand,
+        fulfillmentType: body.fulfillmentType,
+        notes: body.notes,
+        sourceUrl: body.sourceUrl,
+        expectedSellingPrice: body.expectedSellingPrice !== undefined && body.expectedSellingPrice !== "" ? Number(body.expectedSellingPrice) : undefined,
+        asin: body.asin,
+        sku: body.sku,
+        marketplaceId: body.marketplaceId || undefined,
+      },
       user.id,
       user.role
     );

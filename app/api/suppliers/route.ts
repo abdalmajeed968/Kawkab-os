@@ -20,7 +20,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const supplier = await createSupplier(
-      { name: body.name, email: body.email, phone: body.phone, website: body.website, notes: body.notes },
+      {
+        name: body.name,
+        contactName: body.contactName,
+        email: body.email,
+        phone: body.phone,
+        website: body.website,
+        accountNumber: body.accountNumber,
+        paymentTerms: body.paymentTerms,
+        notes: body.notes,
+      },
       user.id,
       user.role
     );

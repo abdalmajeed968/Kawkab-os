@@ -63,8 +63,8 @@ export function NewImportForm() {
       </div>
 
       <div className="form-field">
-        <label>File (.csv, .xlsx, .xls)</label>
-        <input type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <label>File (.csv, .tsv, .txt, .xlsx, .xls)</label>
+        <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
       </div>
 
       {error && <div className="auth-error">{error}</div>}

@@ -6,6 +6,7 @@ import { writeAuditLog } from "./audit";
 import { computeProductDataHealth } from "./dataHealth";
 import { computeLandedCost } from "./landedCost";
 import { ProductStatus, FulfillmentType } from "@prisma/client";
+import { setProductIdentifier } from "./productIdentifiers";
 
 export type ProductTab =
   | "all"
@@ -24,19 +25,31 @@ export type ProductTab =
 export const AMAZON_DEPENDENT_TABS: ProductTab[] = ["most_profitable", "best_selling", "needs_reorder", "losing_money"];
 
 export async function createProduct(
-  input: { name: string; brand?: string; fulfillmentType?: FulfillmentType; notes?: string },
+  input: {
+    name: string;
+    brand?: string;
+    fulfillmentType?: FulfillmentType;
+    notes?: string;
+    sourceUrl?: string;
+    expectedSellingPrice?: number;
+    asin?: string;
+    sku?: string;
+    marketplaceId?: string;
+  },
   actingUserId: string,
   role: Role
 ) {
   requirePermission(role, "manage_products");
 
-  return prisma.$transaction(async (tx) => {
+  const product = await prisma.$transaction(async (tx) => {
     const product = await tx.product.create({
       data: {
         name: input.name,
         brand: input.brand,
         fulfillmentType: input.fulfillmentType ?? "UNKNOWN",
         notes: input.notes,
+        sourceUrl: input.sourceUrl,
+        expectedSellingPrice: input.expectedSellingPrice,
         createdByUserId: actingUserId,
       },
     });
@@ -52,6 +65,19 @@ export async function createProduct(
 
     return product;
   });
+
+  // Identifiers go through their own dedicated history-preserving function
+  // (never overwritten, see lib/productIdentifiers.ts) rather than being
+  // written directly here — same rule applies whether an identifier is set
+  // at creation time or later from the product detail page.
+  if (input.asin?.trim()) {
+    await setProductIdentifier({ productId: product.id, marketplaceId: input.marketplaceId, type: "ASIN", value: input.asin.trim() }, actingUserId, role);
+  }
+  if (input.sku?.trim()) {
+    await setProductIdentifier({ productId: product.id, marketplaceId: input.marketplaceId, type: "INTERNAL_SKU", value: input.sku.trim() }, actingUserId, role);
+  }
+
+  return product;
 }
 
 export async function updateProductStatus(productId: string, status: ProductStatus, actingUserId: string, role: Role) {

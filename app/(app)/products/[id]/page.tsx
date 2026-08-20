@@ -3,6 +3,8 @@ import { getProduct } from "@/lib/products";
 import { computeProductDataHealth } from "@/lib/dataHealth";
 import { computeDecisionBox } from "@/lib/decisionBox";
 import { getEntityAuditTrail } from "@/lib/audit";
+import { getInventoryOnHand } from "@/lib/inventory";
+import { getReorderSignal } from "@/lib/finance";
 import { DataHealthBar } from "@/components/products/DataHealthBar";
 import { DecisionBox } from "@/components/products/DecisionBox";
 import { EligibilityPanel } from "@/components/products/EligibilityPanel";
@@ -12,7 +14,6 @@ import { EntityDocumentUploadForm } from "@/components/documents/EntityDocumentU
 import { InventoryPanel } from "@/components/inventory/InventoryPanel";
 import { BrandLinkControl } from "@/components/brands/BrandLinkControl";
 import { ProductPerformancePanel } from "@/components/products/ProductPerformancePanel";
-import { WidgetSlot } from "@/components/dashboard/WidgetSlot";
 import { getSessionUser } from "@/lib/session";
 
 export default async function ProductDetailPage({ params }: { params: { id: string } }) {
@@ -28,24 +29,27 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
   const dataHealth = computeProductDataHealth(product);
   const decisionBox = computeDecisionBox(product);
   const timeline = await getEntityAuditTrail("Product", product.id);
+  const onHand = await getInventoryOnHand(product.id);
+  const reorder = await getReorderSignal(product.id, onHand);
 
   const latestItem = product.purchaseItems[0];
+  const currentAsin = product.identifiers.find((i) => i.type === "ASIN" && i.isCurrent);
+  const currentSku = product.identifiers.find((i) => i.type === "INTERNAL_SKU" && i.isCurrent);
 
   return (
     <div className="detail-layout">
       <nav className="section-nav">
         <a href="#overview">Overview</a>
-        <a href="#cost-summary">Cost &amp; Purchase Summary</a>
-        <a href="#purchases">Purchases</a>
+        <a href="#performance">Sales Performance</a>
         <a href="#inventory">Inventory</a>
+        <a href="#cost-summary">Cost Summary</a>
+        <a href="#purchases">Purchases</a>
         <a href="#documents">Documents</a>
         <a href="#identity">Product Identity</a>
         <a href="#data-health">Data Health</a>
         <a href="#eligibility">Eligibility</a>
         <a href="#decision">Decision Box</a>
-        <a href="#performance">Sales Performance</a>
         <a href="#timeline">Timeline</a>
-        <a href="#future">Coming later</a>
       </nav>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -59,17 +63,61 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
             </div>
             <span className="badge badge-phase">{product.status}</span>
           </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 24, fontSize: 13, marginTop: 12 }}>
+            <div>
+              <span style={{ color: "var(--kw-text-muted)" }}>ASIN: </span>
+              {currentAsin?.value ?? "—"}
+            </div>
+            <div>
+              <span style={{ color: "var(--kw-text-muted)" }}>SKU: </span>
+              {currentSku?.value ?? "—"}
+            </div>
+            <div>
+              <span style={{ color: "var(--kw-text-muted)" }}>Fulfillment: </span>
+              {product.fulfillmentType}
+            </div>
+            <div>
+              <span style={{ color: "var(--kw-text-muted)" }}>Expected price: </span>
+              {product.expectedSellingPrice ? `$${Number(product.expectedSellingPrice).toFixed(2)}` : "—"}
+            </div>
+            {product.sourceUrl && (
+              <div>
+                <a href={product.sourceUrl} target="_blank" rel="noreferrer" style={{ color: "var(--kw-accent-secondary)" }}>
+                  Supplier listing ↗
+                </a>
+              </div>
+            )}
+          </div>
           <div style={{ marginTop: 10 }}>
             <BrandLinkControl productId={product.id} currentBrandId={product.brandId} />
           </div>
         </div>
 
+        <ProductPerformancePanel productId={product.id} />
+
+        <InventoryPanel productId={product.id} />
+
+        {reorder.estimatedDaysOfStockRemaining !== null && (
+          <div className="card">
+            <div className="card-title" style={{ fontSize: 13 }}>Reorder signal</div>
+            <div style={{ display: "flex", gap: 24, fontSize: 13 }}>
+              <div>
+                <span style={{ color: "var(--kw-text-muted)" }}>Avg. daily units sold (30d): </span>
+                {reorder.avgDailyUnits.toFixed(2)}
+              </div>
+              <div style={{ color: reorder.estimatedDaysOfStockRemaining < 14 ? "var(--kw-status-critical)" : "var(--kw-text-primary)" }}>
+                <span style={{ color: "var(--kw-text-muted)" }}>Est. days of stock remaining: </span>
+                {reorder.estimatedDaysOfStockRemaining.toFixed(0)}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="card" id="cost-summary">
           <div className="card-title">Cost &amp; purchase summary</div>
           <div className="card-subtitle">
             Acquisition landed cost — purchase cost plus supplier shipping, local shipping, prep, packaging, and other
-            attributable costs. This is <strong>not</strong> net profit — Amazon fees and revenue aren't part of it
-            until Amazon integration exists.
+            attributable costs. This is <strong>not</strong> net profit — see Sales Performance above for that.
           </div>
           {latestItem ? (
             <div style={{ display: "flex", gap: 32 }}>
@@ -130,8 +178,6 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
           )}
         </div>
 
-        <InventoryPanel productId={product.id} />
-
         <div className="card" id="documents">
           <div className="card-title">Documents</div>
           {product.documents.length === 0 ? (
@@ -182,13 +228,6 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
         </div>
 
         <Timeline entries={timeline} />
-
-        <div id="future" className="dashboard-grid">
-          <ProductPerformancePanel productId={product.id} />
-          <WidgetSlot title="Replenishment" subtitle="When and how much to reorder" phaseTag="Phase 1C" span={2} />
-          <WidgetSlot title="Returns" subtitle="Return rate and reasons" phaseTag="Phase 4" span={1} />
-          <WidgetSlot title="AI analysis" subtitle="Recommendations and confidence" phaseTag="Phase 6" span={1} />
-        </div>
       </div>
     </div>
   );

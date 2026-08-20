@@ -20,14 +20,15 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", enabled: true },
   { label: "Products", href: "/products", enabled: true },
-  { label: "Purchases", href: "/purchases", enabled: true },
   { label: "Inventory", href: "/inventory", enabled: true },
+  { label: "Purchases", href: "/purchases", enabled: true },
   { label: "Sales", href: "/sales", enabled: true },
   { label: "Imports", href: "/imports", enabled: true },
-  { label: "Finance", href: "/finance", enabled: true },
-  { label: "Reports", href: "/reports", enabled: true },
   { label: "Suppliers", href: "/suppliers", enabled: true },
+  { label: "Finance", href: "/finance", enabled: true },
+  { label: "Research", href: "/research", enabled: true },
   { label: "Documents", href: "/documents", enabled: true },
+  { label: "Reports", href: "/reports", enabled: true },
   { label: "Settings", href: "/settings/users", enabled: true },
 ];
 

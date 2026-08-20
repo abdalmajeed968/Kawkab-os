@@ -25,7 +25,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   try {
     const supplier = await updateSupplier(
       params.id,
-      { name: body.name, email: body.email, phone: body.phone, website: body.website, notes: body.notes },
+      {
+        name: body.name,
+        contactName: body.contactName,
+        email: body.email,
+        phone: body.phone,
+        website: body.website,
+        accountNumber: body.accountNumber,
+        paymentTerms: body.paymentTerms,
+        notes: body.notes,
+      },
       user.id,
       user.role
     );

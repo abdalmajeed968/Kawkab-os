@@ -381,16 +381,52 @@ export async function getBusinessPerformance(dateFrom: Date, dateTo: Date, perio
 export async function getStandardPeriodPerformance() {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-  const [today, last7, last30, thisMonth] = await Promise.all([
+  const [today, yesterday, last7, last30, thisMonth, lastMonth] = await Promise.all([
     getBusinessPerformance(startOfToday, now, "Today"),
+    getBusinessPerformance(startOfYesterday, startOfToday, "Yesterday"),
     getBusinessPerformance(sevenDaysAgo, now, "Last 7 days"),
     getBusinessPerformance(thirtyDaysAgo, now, "Last 30 days"),
     getBusinessPerformance(startOfMonth, now, "This month"),
+    getBusinessPerformance(startOfLastMonth, startOfMonth, "Last month"),
   ]);
 
-  return { today, last7, last30, thisMonth };
+  return { today, yesterday, last7, last30, thisMonth, lastMonth };
+}
+
+export interface ReorderSignal {
+  productId: string;
+  unitsOnHand: number;
+  unitsSoldLast30Days: number;
+  avgDailyUnits: number;
+  estimatedDaysOfStockRemaining: number | null; // null = no sales velocity to estimate from
+}
+
+/**
+ * A real, calculable-today reorder signal — average daily units sold over
+ * the last 30 days, projected against current on-hand quantity. Returns
+ * null for estimatedDaysOfStockRemaining when there's no sales velocity
+ * yet rather than fabricating a number from zero sales.
+ */
+export async function getReorderSignal(productId: string, unitsOnHand: number): Promise<ReorderSignal> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const saleItems = await prisma.saleItem.findMany({
+    where: { productId, sale: { saleDate: { gte: thirtyDaysAgo } } },
+    select: { quantity: true },
+  });
+  const unitsSoldLast30Days = saleItems.reduce((sum, i) => sum + i.quantity, 0);
+  const avgDailyUnits = unitsSoldLast30Days / 30;
+
+  return {
+    productId,
+    unitsOnHand,
+    unitsSoldLast30Days,
+    avgDailyUnits,
+    estimatedDaysOfStockRemaining: avgDailyUnits > 0 ? unitsOnHand / avgDailyUnits : null,
+  };
 }
