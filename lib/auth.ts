@@ -33,6 +33,14 @@ import { prisma } from "./prisma";
 import { writeAuditLog } from "./audit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Explicit rather than relying on Auth.js's automatic AUTH_SECRET
+  // detection — that auto-detection did not reliably wire the secret
+  // through in this Vercel deployment (runtime threw MissingSecret even
+  // with AUTH_SECRET set in the Vercel project for Production/Preview).
+  // middleware.ts already reads process.env.AUTH_SECRET directly for the
+  // same purpose; this makes the main auth config match it exactly rather
+  // than depend on implicit env lookup.
+  secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt", maxAge: 12 * 60 * 60 }, // 12h — short-lived by design, see note above
   pages: { signIn: "/login" },
