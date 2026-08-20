@@ -1,10 +1,17 @@
 // lib/storage.ts
 //
 // Storage abstraction so document uploads aren't hard-coded to one backend.
-// LocalFilesystemStorage for development; S3StorageAdapter (AWS S3) for
+// LocalFilesystemStorage for local development only (Vercel's serverless
+// functions have no persistent disk across invocations, so this must never
+// be selected in production); S3StorageAdapter (real AWS S3) for
 // production, selected via STORAGE_PROVIDER — nothing above this layer
-// changes when the provider changes. Per Owner approval, S3 is a real
-// implementation in Phase 0, not a placeholder.
+// changes when the provider changes. Vercel Blob was deliberately NOT
+// added as an alternative here: its objects are public-by-obscurity
+// (reachable by anyone with the URL), which would weaken the documented
+// invariant that every document read re-checks the same permission the
+// upload path enforces — real business documents (supplier invoices, tax
+// records, business registration) must stay behind that check, not a
+// guessable-URL substitute for it.
 
 import { writeFile, mkdir, readFile } from "fs/promises";
 import path from "path";
