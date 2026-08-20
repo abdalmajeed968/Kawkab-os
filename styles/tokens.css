@@ -1,0 +1,68 @@
+/* styles/tokens.css
+ *
+ * KAWKAB OS design tokens — premium dark/neon system.
+ * Every color used anywhere in the app comes from this file. No component
+ * should contain a hardcoded hex value — that's a Phase 0 acceptance
+ * criterion, spot-checked before sign-off.
+ *
+ * Revision: the primary brand accent is electric cyan/blue, not neon
+ * green — green is reserved for profit/success/healthy states so it
+ * keeps a consistent meaning everywhere it appears, instead of doing
+ * double duty as both "the brand" and "things are going well."
+ */
+
+:root {
+  /* Surfaces — black / deep navy, not pure black, so elevation reads */
+  --kw-bg-base: #05060a;
+  --kw-bg-surface: #0d0f18;
+  --kw-bg-surface-2: #151826;
+  --kw-bg-surface-3: #1c2033;
+  --kw-border: #232742;
+  --kw-border-strong: #323756;
+
+  /* Text */
+  --kw-text-primary: #f2f3f8;
+  --kw-text-secondary: #9a9fc0;
+  --kw-text-muted: #5c6089;
+
+  /* Brand accents */
+  --kw-accent-primary: #29d3ff;     /* electric cyan/blue — primary brand accent */
+  --kw-accent-primary-dim: #17708f;
+  --kw-accent-secondary: #8b5cf6;   /* violet/purple — secondary accent */
+  --kw-accent-secondary-dim: #4c2f96;
+  --kw-glow-primary: 0 0 14px rgba(41, 211, 255, 0.35);
+  --kw-glow-secondary: 0 0 14px rgba(139, 92, 246, 0.32);
+
+  /* Semantic status colors — meaning stays fixed everywhere they're used */
+  --kw-status-profit: #22c55e;        /* profit / success / healthy */
+  --kw-status-profit-dim: #14532d;
+  --kw-status-warning: #f59e0b;       /* warnings / reorder-soon states */
+  --kw-status-warning-dim: #78350f;
+  --kw-status-critical: #ef4444;      /* loss / critical */
+  --kw-status-critical-alt: #ec4899;  /* secondary critical accent, used sparingly (e.g. urgent AI signal) */
+  --kw-status-critical-dim: #7f1d1d;
+  --kw-status-neutral: #6b7280;       /* incomplete / not-yet-scored */
+
+  /* Spacing scale */
+  --kw-space-1: 4px;
+  --kw-space-2: 8px;
+  --kw-space-3: 12px;
+  --kw-space-4: 16px;
+  --kw-space-5: 24px;
+  --kw-space-6: 32px;
+  --kw-space-7: 48px;
+  --kw-space-8: 64px;
+
+  /* Radius */
+  --kw-radius-sm: 6px;
+  --kw-radius-md: 10px;
+  --kw-radius-lg: 16px;
+
+  /* Typography */
+  --kw-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --kw-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace; /* money / numeric columns, tabular figures */
+
+  /* Motion */
+  --kw-transition-fast: 120ms ease;
+  --kw-transition-base: 200ms ease;
+}

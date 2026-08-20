@@ -1,0 +1,61 @@
+"use client";
+
+import { useState, ChangeEvent, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
+const DOCUMENT_TYPES = ["INVOICE", "RECEIPT", "PACKING_SLIP", "CREDIT_MEMO", "SUPPLIER_EMAIL", "OTHER"];
+
+export function EntityDocumentUploadForm({ uploadUrl }: { uploadUrl: string }) {
+  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0]);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    setFile(e.target.files?.[0] ?? null);
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!file) {
+      setError("Choose a file first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("documentType", documentType);
+
+    setSubmitting(true);
+    const res = await fetch(uploadUrl, { method: "POST", body: formData });
+    setSubmitting(false);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "Upload failed.");
+      return;
+    }
+
+    setFile(null);
+    router.refresh();
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <select value={documentType} onChange={(e) => setDocumentType(e.target.value)}>
+        {DOCUMENT_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t.replaceAll("_", " ")}
+          </option>
+        ))}
+      </select>
+      <input type="file" onChange={handleFileChange} />
+      <button type="submit" className="button-secondary" disabled={submitting}>
+        {submitting ? "Uploading…" : "Upload"}
+      </button>
+      {error && <span className="auth-error">{error}</span>}
+    </form>
+  );
+}
